@@ -1,32 +1,34 @@
 # Quick Start Guide
 
-> EZStore - B2B Quotation & Order Management System（AI Agent 開發工作坊）
+> EZStore - B2B Quotation & Order Management System (AI Agent development workshop)
+
+[中文版](quickstart.zh-TW.md)
 
 ---
 
-## 1. 課前準備（請在上課前完成）
+## 1. Before class (please finish before the workshop)
 
-### 1.1 必要工具
+### 1.1 Required tools
 
-| 工具 | 用途 | 下載 |
-|------|------|------|
-| Docker Desktop | 一鍵啟動整套系統（資料庫、後端、前端、Agent、MCP Server） | https://www.docker.com/products/docker-desktop/ |
-| uv | Python 套件與虛擬環境管理，也用來安裝 agents-cli | https://docs.astral.sh/uv/getting-started/installation/ |
-| google-agents-cli | Google 官方 Agent 開發 CLI（scaffold、playground、eval） | 安裝 uv 後執行 `uv tool install google-agents-cli` |
-| AI coding 工具 | Claude Code、Gemini CLI、Antigravity、Cursor 等擇一 | 依各工具官網 |
-| Google AI Studio API key | Agent 使用的 Gemini 模型（免費方案即可） | https://aistudio.google.com/apikey |
+| Tool | Purpose | Download |
+|------|---------|----------|
+| Docker Desktop | Starts the whole system with one command (database, backend, frontend, agent, MCP server) | https://www.docker.com/products/docker-desktop/ |
+| uv | Python package and virtualenv manager, also installs agents-cli | https://docs.astral.sh/uv/getting-started/installation/ |
+| google-agents-cli | Google's official agent development CLI (scaffold, playground, eval) | after installing uv: `uv tool install google-agents-cli` |
+| An AI coding tool | One of Claude Code, Gemini CLI, Antigravity, Cursor, ... | see each tool's site |
+| Google AI Studio API key | The Gemini model used by the agent (free tier is enough) | https://aistudio.google.com/apikey |
 
-> 只需要「執行」系統的話，有 Docker 就夠了。Go、Bun、Node.js 只有在要修改後端或前端原始碼、或在本機跑 E2E 時才需要。
+> If you only need to *run* the system, Docker is enough. Go, Bun and Node.js are only needed to change backend or frontend source code, or to run E2E tests locally.
 
-### 1.2 選用工具（本機開發／測試）
+### 1.2 Optional tools (local development / testing)
 
-| 工具 | 用途 | 下載 |
-|------|------|------|
-| Node.js + Bun | 前端本機開發與 Playwright E2E | https://nodejs.org/ 、 https://bun.com/ |
-| Go | 後端本機開發 | https://go.dev/dl/ |
-| Playwright | 本機跑 E2E 測試 | https://playwright.dev/docs/intro |
+| Tool | Purpose | Download |
+|------|---------|----------|
+| Node.js + Bun | Frontend development and Playwright E2E | https://nodejs.org/ , https://bun.com/ |
+| Go | Backend development | https://go.dev/dl/ |
+| Playwright | Running E2E tests locally | https://playwright.dev/docs/intro |
 
-### 1.3 驗證安裝
+### 1.3 Verify the installation
 
 ```bash
 docker --version && docker compose version
@@ -36,11 +38,11 @@ agents-cli --version
 
 ---
 
-## 2. 取得專案
+## 2. Get the project
 
 ### Step 0: Fork the repository
 
-到 GitHub fork 本專案：https://github.com/cshliu77/ezstore（保持勾選「Copy the main branch only」）
+Fork this repository on GitHub: https://github.com/cshliu77/ezstore (keep "Copy the main branch only" checked)
 
 ### Step 1: Clone your forked repository
 
@@ -49,101 +51,101 @@ git clone https://github.com/<your-github-username>/ezstore.git
 cd ezstore
 ```
 
-### Step 2: 設定 API key
+### Step 2: Set the API key
 
 ```bash
 cp .env.example .env
 ```
 
-用編輯器打開 `.env`，把 `GEMINI_API_KEY=` 後面填入你的 Google AI Studio API key。`.env` 不會被提交到 Git。
+Open `.env` in an editor and put your Google AI Studio API key after `GEMINI_API_KEY=`. `.env` is never committed to Git.
 
-> 已有 GCP 專案的人也可以改走 Vertex AI：執行 `gcloud auth application-default login`，在 `.env` 改設 `GOOGLE_GENAI_USE_VERTEXAI=true` 與 `GOOGLE_CLOUD_PROJECT`。課堂上建議用 AI Studio key，不需要 GCP 帳單。
+> If you already have a GCP project you can use Vertex AI instead: run `gcloud auth application-default login` and set `GOOGLE_GENAI_USE_VERTEXAI=true` and `GOOGLE_CLOUD_PROJECT` in `.env`. For the workshop we recommend an AI Studio key; it needs no GCP billing.
 
 ---
 
-## 3. 啟動系統
+## 3. Start the system
 
-### Step 3: 用預建映像啟動（最快）
+### Step 3: Start with prebuilt images (fastest)
 
 ```bash
 docker compose up -d
 ```
 
-### Step 4: 用本機原始碼建置啟動（修改程式後使用）
+### Step 4: Build from local source (after changing code)
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
-### Step 5: 灌入測試資料
+### Step 5: Load the test data
 
 ```bash
 docker compose exec db psql -U ezstore -f /scripts/seed-test-data.sql
 ```
 
-### Step 6: 確認服務
+### Step 6: Check the services
 
-| 服務 | 網址 |
-|------|------|
-| 前端 | http://localhost:3000 |
-| AI 智能助理（Chat UI） | http://localhost:3000/agent |
-| 後端 API | http://localhost:8080/api/v1 |
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| AI assistant (Chat UI) | http://localhost:3000/agent |
+| Backend API | http://localhost:8080/api/v1 |
 | Swagger UI | http://localhost:8080/swagger/index.html |
-| Health Check | http://localhost:8080/health |
+| Health check | http://localhost:8080/health |
 
-到 http://localhost:3000/agent 輸入「我要查詢報價單，報價單編號：QT-20260330-001」，應該看到報價單內容與一個可以點的連結。
-
----
-
-## 4. 設定 AI coding 工具的 MCP（開始開發前）
-
-把 spec 餵給 AI coding 工具之前，先設定好下列 MCP／skills，AI 才能查到最新文件並自動操作瀏覽器：
-
-| 工具 | 用途 | 設定說明 |
-|------|------|----------|
-| google-agents-cli skills | ADK 開發流程、scaffold、eval、deploy 的官方 skills | `uvx google-agents-cli setup` |
-| ADK Docs MCP Server | ADK 官方文件 | https://google.github.io/adk-docs/tutorials/coding-with-ai/#adk-docs-mcp-server |
-| Context7 MCP | 各套件最新文件 | https://context7.com/docs/resources/all-clients |
-| Playwright-MCP | 讓 AI 操作瀏覽器做 E2E | https://github.com/microsoft/playwright-mcp?tab=readme-ov-file#getting-started |
-| chrome-devtools-mcp（選用） | 讓 AI 看 Console／Network | https://github.com/ChromeDevTools/chrome-devtools-mcp?tab=readme-ov-file#getting-started |
+Open http://localhost:3000/agent and type "我要查詢報價單，報價單編號：QT-20260330-001". You should see the quotation details and a clickable link.
 
 ---
 
-## 5. 開發與驗證
+## 4. Configure MCP for your AI coding tool (before you start developing)
 
-### Step 7: 把需求提示詞交給 AI coding 工具
+Before feeding the spec to your AI coding tool, set up the MCP servers / skills below so the AI can read current documentation and drive a browser:
 
-`agent-spec-prompt.md` 就是要餵給 AI 的完整需求。它會分六個階段實作，每個階段停下來請你驗收。
+| Tool | Purpose | Setup |
+|------|---------|-------|
+| google-agents-cli skills | Official skills for the ADK workflow, scaffold, eval, deploy | `uvx google-agents-cli setup` |
+| ADK Docs MCP Server | Official ADK documentation | https://google.github.io/adk-docs/tutorials/coding-with-ai/#adk-docs-mcp-server |
+| Context7 MCP | Current docs for any library | https://context7.com/docs/resources/all-clients |
+| Playwright-MCP | Lets the AI drive a browser for E2E | https://github.com/microsoft/playwright-mcp?tab=readme-ov-file#getting-started |
+| chrome-devtools-mcp (optional) | Lets the AI inspect Console / Network | https://github.com/ChromeDevTools/chrome-devtools-mcp?tab=readme-ov-file#getting-started |
 
-### Step 8: 測試
+---
+
+## 5. Develop and verify
+
+### Step 7: Hand the requirements prompt to your AI coding tool
+
+`agent-spec-prompt.md` is the complete requirement to feed to the AI. It implements the work in six stages and stops after each one for you to verify.
+
+### Step 8: Tests
 
 ```bash
-# 前端 E2E（本機）
+# Frontend E2E (local)
 cd frontend && bun install && bun run e2e
 
-# 前端 E2E（容器）
+# Frontend E2E (container)
 docker compose run --rm e2e
 
-# Agent 單元測試與離線整合測試（不需 API key；整合測試需要 MCP Server 在本機執行）
+# Agent unit tests and offline integration tests (no API key; integration tests need the MCP server reachable locally)
 cd agent && uv sync --group dev && uv run pytest tests/unit tests/integration -q
 
-# Agent 評估（需要 API key、後端與 MCP Server 都在執行）
+# Agent evaluation (needs an API key, backend and MCP server running)
 cd agent && agents-cli eval run
 ```
 
-### Step 9: Agent 可信賴度評鑑 LAB
+### Step 9: Agent trustworthiness evaluation lab
 
-Agent 做完之後，用 `agents-cli eval` 評鑑它。有兩個版本：
+Once the agent is done, evaluate it with `agents-cli eval`. There are two versions:
 
-| 版本 | 檔案 | 時間 | 內容 |
+| Version | File | Time | Content |
 |---|---|---|---|
-| 課堂版 | [eval-lab-quick.md](eval-lab-quick.md) | 25 分鐘 | 跑一組考題、讀逐題理由、加一題發現評分規則的盲點、破壞測試 |
-| 完整版（回家做） | [eval-lab.md](eval-lab.md) | 60–90 分鐘 | 修評分規則、跑會改資料的操作類考題、穩定性比對、自己寫多輪案例、寫一頁可信賴度報告 |
+| In class | [eval-lab-quick.md](eval-lab-quick.md) | 25 min | Run one dataset, read per-case reasons, add a case that exposes a blind spot in the grading rules, break test |
+| Full (take home) | [eval-lab.md](eval-lab.md) | 60–90 min | Fix grading rules, run the data-changing action dataset, stability comparison, write your own multi-turn case, write a one-page trustworthiness report |
 
-**前置條件**
+**Prerequisites**
 
-- Step 7 的 Agent 已完成，`docker compose ps` 看到 db、backend、mcp-server、agent、frontend 都在跑，測試資料已灌入（Step 5）。
-- `agent/.env` 已設定憑證（AI Studio 的 `GEMINI_API_KEY`，或 Vertex AI 的 `GOOGLE_GENAI_USE_VERTEXAI=true` + `GOOGLE_CLOUD_PROJECT`），且 `MCP_URL=http://localhost:8010/mcp`。
-- 在 `agent/` 目錄執行過 `uv sync --group dev --extra eval`。
+- The agent from Step 7 is done, `docker compose ps` shows db, backend, mcp-server, agent and frontend running, and the test data is loaded (Step 5).
+- `agent/.env` has credentials (AI Studio `GEMINI_API_KEY`, or Vertex AI `GOOGLE_GENAI_USE_VERTEXAI=true` + `GOOGLE_CLOUD_PROJECT`) and `MCP_URL=http://localhost:8010/mcp`.
+- You have run `uv sync --group dev --extra eval` inside `agent/`.
 
-**費用**：課堂版呼叫 Gemini 約 15 次，完整版約 40 到 60 次，AI Studio 免費方案都足夠。
+**Cost**: the in-class version makes about 15 Gemini calls, the full version about 40 to 60. The AI Studio free tier covers both.
