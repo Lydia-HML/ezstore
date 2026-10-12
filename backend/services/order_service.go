@@ -52,13 +52,7 @@ func (s *OrderService) Create(input *OrderCreateInput) (*models.Order, error) {
 		return nil, errors.New("客戶不存在")
 	}
 
-	number, err := s.generateNumber()
-	if err != nil {
-		return nil, err
-	}
-
 	order := &models.Order{
-		OrderNumber: number,
 		CustomerID:  input.CustomerID,
 		QuotationID: input.QuotationID,
 		Status:      "pending",
@@ -77,7 +71,7 @@ func (s *OrderService) Create(input *OrderCreateInput) (*models.Order, error) {
 	}
 	order.TotalPrice = totalPrice
 
-	if err := s.Repo.Create(order); err != nil {
+	if err := createWithRetry(s.generateNumber, func(n string) { order.OrderNumber = n }, func() error { return s.Repo.Create(order) }); err != nil {
 		return nil, err
 	}
 
@@ -149,11 +143,12 @@ func (s *OrderService) buildItems(inputs []OrderItemInput) ([]models.OrderItem, 
 	return items, nil
 }
 
-func (s *OrderService) generateNumber() (string, error) {
+// generateNumber 產生 ORD-YYYYMMDD-NNN；offset 用於撞號重試時往後推序號。
+func (s *OrderService) generateNumber(offset int64) (string, error) {
 	count, err := s.Repo.CountToday()
 	if err != nil {
 		return "", err
 	}
 	today := time.Now().Format("20060102")
-	return fmt.Sprintf("ORD-%s-%03d", today, count+1), nil
+	return fmt.Sprintf("ORD-%s-%03d", today, count+1+offset), nil
 }

@@ -135,8 +135,8 @@ class Backend:
         }
 
 
-def run_post_checks(backend: Backend, checks: list[dict], baseline: dict) -> list[dict]:
-    """回傳 [{name, points, earned, detail}]"""
+def run_post_checks(backend: Backend, checks: list[dict], baseline: dict, runs: int = 1) -> list[dict]:
+    """回傳 [{name, points, earned, detail}]。runs > 1 時，數量上限（max_new / max_count）按次數放大。"""
     results = []
     try:
         quotations = backend.quotations()
@@ -176,8 +176,8 @@ def run_post_checks(backend: Backend, checks: list[dict], baseline: dict) -> lis
             elif t == "copies_created":
                 n = len(copies_of(c["source"]))
                 lo = int(c.get("min_count", 1))
-                hi = c.get("max_count")
-                ok = n >= lo and (hi is None or n <= int(hi))
+                hi = None if c.get("max_count") is None else int(c["max_count"]) * runs
+                ok = n >= lo and (hi is None or n <= hi)
                 detail = f"複製自 {c['source']} 的新單 {n} 張（要求 ≥{lo}{'' if hi is None else f'，≤{hi}'}）"
             elif t == "new_quotation_with_factor":
                 hits = [q for q in copies_of(c["source"]) if fnum(q["pricing_factor"]) == fnum(c["pricing_factor"])]
@@ -209,11 +209,11 @@ def run_post_checks(backend: Backend, checks: list[dict], baseline: dict) -> lis
                     else f"沒有新訂單關聯 {c['quotation_number']}"
                 )
             elif t == "no_new_quotations":
-                allowed = int(c.get("max_new", 0))
+                allowed = int(c.get("max_new", 0)) * runs
                 ok = len(new_q) <= allowed
                 detail = f"新增報價單 {len(new_q)} 張（允許 ≤{allowed}）"
             elif t == "no_new_orders":
-                allowed = int(c.get("max_new", 0))
+                allowed = int(c.get("max_new", 0)) * runs
                 ok = len(new_o) <= allowed
                 detail = f"新增訂單 {len(new_o)} 筆（允許 ≤{allowed}）"
             else:
@@ -443,7 +443,7 @@ def main() -> int:
             log(f"  {flag} {cid:<34} {avg*100:6.1f}%  " + "  ".join(f"{n}={s:.2f}" for n, s, _, _ in last_parts))
         ratio = (sum_s / sum_w) if sum_w else 0.0
 
-        pc = run_post_checks(backend, post_checks, baseline) if post_checks else []
+        pc = run_post_checks(backend, post_checks, baseline, runs=args.runs) if post_checks else []
         for r in pc:
             mark = "ℹ" if r["points"] == 0 else ("✓" if r["earned"] else "✗")
             log(f"  {mark} 核對 {r['name']:<28} {r['earned']:g}/{r['points']:g}  {r['detail']}")
