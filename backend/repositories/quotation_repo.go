@@ -73,7 +73,8 @@ func (r *QuotationRepository) Delete(id uint) error {
 
 func (r *QuotationRepository) CountToday() (int64, error) {
 	var count int64
-	err := r.DB.Model(&models.Quotation{}).
+	// 含已軟刪除的資料：單號的唯一索引包含它們，不算進去會撞號
+	err := r.DB.Unscoped().Model(&models.Quotation{}).
 		Where("DATE(created_at) = CURRENT_DATE").
 		Count(&count).Error
 	return count, err
