@@ -367,6 +367,8 @@ Finally, turn today's numbers into one page, imagining a manager who has never s
 
 If you can write point 7, you already understand that trustworthiness is not a score but an ongoing process of adding test cases.
 
+> For point 3 you can reuse the self-acceptance score report: `python3 scripts/grading/grade_agent.py --suite scripts/grading/student-suite.json` writes per-case scores, judge reasons and backend checks to `artifacts/grading/<timestamp>/report.md`.
+
 ---
 
 ## Appendix: common problems

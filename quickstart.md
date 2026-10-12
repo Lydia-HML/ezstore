@@ -133,7 +133,12 @@ cd agent && uv sync --group dev && uv run pytest tests/unit tests/integration -q
 
 # Agent evaluation (needs an API key, backend and MCP server running)
 cd agent && agents-cli eval run
+
+# Agent self-acceptance score (0–100; run at the repo root, same prerequisites, about 3 minutes)
+python3 scripts/grading/grade_agent.py --suite scripts/grading/student-suite.json
 ```
+
+The score runs the two datasets required by the spec plus two extra cases, and queries the backend to confirm the original quotation is untouched and the copies and order really exist. The report is written to `artifacts/grading/<timestamp>/report.md`. Teaching assistants grade with a different, private dataset but the same script.
 
 ### Step 9: Agent trustworthiness evaluation lab
 

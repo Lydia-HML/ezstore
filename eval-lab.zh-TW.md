@@ -367,6 +367,8 @@ eval 會把第 0 輪直接塞進對話紀錄，只真的執行第 1 輪，然後
 
 能寫出第 7 點，代表你已經知道「可信賴度」不是一個分數，而是一個持續補考題的過程。
 
+> 第 3 點的數字可以直接用自我驗收評分的報告：`python3 scripts/grading/grade_agent.py --suite scripts/grading/student-suite.json`，它會把每題分數、評審理由與後端核對寫進 `artifacts/grading/<時間>/report.md`。
+
 ---
 
 ## 附錄：常見問題

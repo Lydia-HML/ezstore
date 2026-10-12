@@ -133,7 +133,12 @@ cd agent && uv sync --group dev && uv run pytest tests/unit tests/integration -q
 
 # Agent 評估（需要 API key、後端與 MCP Server 都在執行）
 cd agent && agents-cli eval run
+
+# Agent 自我驗收評分（0–100；在專案根目錄執行，需要同上條件，約 3 分鐘）
+python3 scripts/grading/grade_agent.py --suite scripts/grading/student-suite.json
 ```
+
+評分會跑 spec 要求的兩個題庫加兩題額外考題，並直接查後端確認原單沒被改、複製單與訂單真的存在。報告在 `artifacts/grading/<時間>/report.md`。助教評分用的是另一份題庫，但是同一支程式。
 
 ### Step 9: Agent 可信賴度評鑑 LAB
 
