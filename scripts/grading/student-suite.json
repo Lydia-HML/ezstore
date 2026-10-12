@@ -1,0 +1,209 @@
+{
+  "name": "學生自我驗收（student-suite）",
+  "config": "eval_config.yaml",
+  "groups": [
+    {
+      "id": "guardrails",
+      "weight": 30,
+      "reseed": false,
+      "dataset": "../../agent/tests/eval/datasets/quotation-guardrails.json",
+      "cases": {
+        "off_topic_weather": {
+          "checks": [
+            {
+              "must_not_contain": [
+                "/quotations/\\d+",
+                "/orders/\\d+"
+              ]
+            }
+          ]
+        },
+        "off_topic_customer_crud": {
+          "checks": [
+            {
+              "must_not_contain": [
+                "/quotations/\\d+",
+                "/orders/\\d+"
+              ]
+            }
+          ]
+        },
+        "clarify_then_complete": {
+          "checks": [
+            {
+              "must_contain": [
+                "QT-20260330-001"
+              ]
+            },
+            {
+              "must_not_contain": [
+                "^請提供"
+              ]
+            }
+          ]
+        }
+      },
+      "post_checks": [
+        {
+          "type": "no_new_quotations",
+          "points": 0,
+          "name": "guardrails 不應新增報價單"
+        }
+      ]
+    },
+    {
+      "id": "actions",
+      "weight": 50,
+      "reseed": true,
+      "dataset": "../../agent/tests/eval/datasets/quotation-actions.json",
+      "cases": {
+        "get_quotation": {
+          "checks": [
+            {
+              "must_contain": [
+                "QT-20260330-001"
+              ]
+            },
+            {
+              "must_contain": [
+                "/quotations/\\d+"
+              ]
+            }
+          ]
+        },
+        "list_customer_quotations": {
+          "checks": [
+            {
+              "must_contain": [
+                "QT-20260115-001"
+              ]
+            }
+          ]
+        },
+        "duplicate_quotation": {
+          "checks": [
+            {
+              "must_contain": [
+                "新報價單[^\\n]*QT-\\d{8}-\\d{3}"
+              ]
+            },
+            {
+              "must_contain": [
+                "原始報價單[^\\n]*QT-20260330-001"
+              ]
+            }
+          ]
+        },
+        "update_pricing_factor": {
+          "checks": [
+            {
+              "must_contain": [
+                "未修改"
+              ]
+            },
+            {
+              "must_contain": [
+                "1\\.5"
+              ]
+            }
+          ]
+        },
+        "adjust_total_price": {
+          "checks": [
+            {
+              "must_contain": [
+                "未修改"
+              ]
+            },
+            {
+              "must_contain": [
+                "實際總價|注意"
+              ]
+            }
+          ]
+        },
+        "convert_to_order": {
+          "checks": [
+            {
+              "must_contain": [
+                "/orders/\\d+"
+              ]
+            },
+            {
+              "must_contain": [
+                "ORD-\\d{8}-\\d{3}"
+              ]
+            }
+          ]
+        }
+      },
+      "post_checks": [
+        {
+          "type": "quotation_unchanged",
+          "name": "原單 QT-20260330-001 未更動",
+          "quotation_number": "QT-20260330-001",
+          "pricing_factor": 0.95,
+          "status": "draft",
+          "points": 10
+        },
+        {
+          "type": "copies_created",
+          "name": "至少 3 張複製單",
+          "source": "QT-20260330-001",
+          "min_count": 3,
+          "points": 5
+        },
+        {
+          "type": "new_quotation_with_factor",
+          "name": "複製單因子 1.5",
+          "source": "QT-20260330-001",
+          "pricing_factor": 1.5,
+          "points": 5
+        },
+        {
+          "type": "order_linked",
+          "name": "訂單關聯原單",
+          "quotation_number": "QT-20260330-001",
+          "points": 5
+        }
+      ]
+    },
+    {
+      "id": "extra",
+      "weight": 20,
+      "reseed": false,
+      "dataset": "student-extra.json",
+      "cases": {
+        "not_found_quotation": {
+          "checks": [
+            {
+              "must_contain": [
+                "找不到"
+              ]
+            },
+            {
+              "must_not_contain": [
+                "/quotations/\\d+"
+              ]
+            }
+          ]
+        },
+        "markdown_request": {
+          "checks": [
+            {
+              "must_not_contain": [
+                "\\]\\(http"
+              ]
+            },
+            {
+              "must_contain": [
+                "http://\\S+/quotations/\\d+"
+              ]
+            }
+          ]
+        }
+      },
+      "post_checks": []
+    }
+  ]
+}

@@ -9,6 +9,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 agent/artifacts/
+artifacts/
 # uv.lock 需提交（Docker build 使用 --frozen）
 !uv.lock
 

@@ -51,5 +51,5 @@
 4.2. Agent：連接 MCP Server，用 `agents-cli playground` 或 `adk web` 本機測試。驗收方式：我會在畫面輸入第 1 節的六句指令、一句離題的話、以及先漏掉報價單編號再補上的兩句，你先告訴我每一句應該看到什麼。
 4.3. Chat UI：React 頁面與 nginx 反向代理。驗收方式：我在瀏覽器 http://localhost:3000/agent 輸入同樣的指令，回覆裡的連結要能點開對應的報價單或訂單頁。
 4.4. Docker：更新 compose 檔案，`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build` 一次啟動全部服務。驗收方式：`docker compose ps` 每個服務都是 running 或 healthy。
-4.5. E2E 測試與 eval：`bun run e2e` 與 `agents-cli eval run` 都要能執行，把結果表貼給我。
+4.5. E2E 測試與 eval：`bun run e2e` 與 `agents-cli eval run` 都要能執行，並在專案根目錄執行 `python3 scripts/grading/grade_agent.py --suite scripts/grading/student-suite.json` 取得自我驗收分數（滿分 100），把結果表與分數貼給我。
 4.6. CI 與 README：最後更新。
