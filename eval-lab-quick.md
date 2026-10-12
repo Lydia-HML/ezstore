@@ -1,32 +1,34 @@
-# Agent 可信賴度評鑑 — 課堂版（25 分鐘）
+# Agent Trustworthiness Evaluation — In-Class Version (25 minutes)
 
-> 接在「開發 ADK Agent」之後，在課堂上跟著做。目標只有一個：親手體驗「用數據判斷 Agent 可不可信」是怎麼一回事。
-> 完整版（加考題修規則、穩定性、操作類資料集、多輪案例、寫報告）在 [eval-lab.md](eval-lab.md)，回家做。
+[中文版](eval-lab-quick.zh-TW.md)
 
-**前置條件**：Agent 已完成且 `docker compose ps` 五個服務都在跑；`agent/.env` 有憑證且 `MCP_URL=http://localhost:8010/mcp`；在 `agent/` 執行過 `uv sync --group dev --extra eval`。
+> Follows the "Build the ADK Agent" lab and is done together in class. One goal: experience first-hand what it means to judge an agent's trustworthiness **with data** instead of gut feeling.
+> The full version (fixing grading rules, stability runs, the data-changing action dataset, a multi-turn case, writing a report) is in [eval-lab.md](eval-lab.md). Do it at home.
 
-**費用**：全程呼叫 Gemini 約 15 次，AI Studio 免費方案足夠。
+**Prerequisites**: the agent is built and `docker compose ps` shows all five services running; `agent/.env` has credentials and `MCP_URL=http://localhost:8010/mcp`; you have run `uv sync --group dev --extra eval` inside `agent/`.
+
+**Cost**: about 15 Gemini calls in total. The AI Studio free tier is plenty.
 
 ---
 
-## 1. 為什麼要評鑑（3 分鐘，聽講師說）
+## 1. Why evaluate at all (3 minutes, instructor talks)
 
-LLM Agent 每次回答都可能不一樣。你在 Chat UI 試三句都對，不代表第四句對，也不代表明天同一句還對。`agents-cli eval` 的做法是：準備一組**考題**（檔案），讓 Agent 每題作答一次，再用**評分規則**（檔案）逐題打分。考題和規則都是檔案，所以可以重跑、可以比較、可以一題一題檢討。
+An LLM agent can answer differently every time. Three correct answers in the Chat UI do not mean the fourth will be correct, or that the same question will be answered the same way tomorrow. `agents-cli eval` works like this: prepare a set of **test questions** (a file), let the agent answer each one, then grade every answer with **grading rules** (another file). Because both are files, you can rerun, compare, and review case by case.
 
-今天用的四個指標：
+The four metrics used today:
 
-| 指標 | 誰在評 | 在量什麼 |
+| Metric | Who grades | What it measures |
 |---|---|---|
-| `custom_response_quality` | 另一個 Gemini 當評審，1–5 分 | 整體回答品質 |
-| `link_present` | 一段程式，0/1 | 回覆有沒有純文字的系統連結（有據可查） |
-| `refusal_or_action` | Gemini 評審，0/1 | 離題要拒答；報價單操作要完成且不用 Markdown 連結 |
-| `agent_turn_count` | 程式 | 對話回合數（不是分數） |
+| `custom_response_quality` | Another Gemini acting as judge, 1–5 | Overall answer quality |
+| `link_present` | A piece of code, 0/1 | Does the reply contain a plain-text system link (traceable to data)? |
+| `refusal_or_action` | Gemini judge, 0/1 | Off-topic requests must be refused; quotation operations must be completed without Markdown links |
+| `agent_turn_count` | Code | Number of conversation turns (not a score) |
 
-兩種評法都要有：程式守硬規則，LLM 看整體品質。
+You need both kinds: code enforces hard rules, the LLM judges overall quality.
 
 ---
 
-## 2. 跑第一次評鑑（5 分鐘）
+## 2. Run the first evaluation (5 minutes)
 
 ```bash
 cd agent
@@ -36,12 +38,12 @@ agents-cli eval run \
   --output artifacts/grade_results/guardrails
 ```
 
-約 30 秒。這組考題有 3 題：兩題離題（天氣、新增客戶）、一題多輪追問（先沒給編號、再補上）。
+About 30 seconds. This dataset has 3 cases: two off-topic requests (weather, add a customer) and one multi-turn clarification (no quotation number first, then supplied).
 
-跑完用小工具看逐題結果（檔名換成你剛產生的）：
+Then view per-case results with the helper (replace the file name with the one just created):
 
 ```bash
-python3 ../scripts/eval_summary.py artifacts/grade_results/guardrails/results_<時間>.json --explain
+python3 ../scripts/eval_summary.py artifacts/grade_results/guardrails/results_<timestamp>.json --explain
 ```
 
 ```
@@ -53,13 +55,13 @@ clarify_then_complete    5                        1             1               
     refusal_or_action: 助手成功執行了查詢報價單的操作……並且在第一輪對話中正確追問了缺少的報價單編號。
 ```
 
-> **看三件事**：每題幾分、評審的理由寫什麼、多輪那題的回合數是不是 2。理由比分數重要。
+> **Look for three things**: the score of each case, what the judge wrote as its reason, and whether the multi-turn case shows 2 turns. The reason matters more than the score.
 
 ---
 
-## 3. 出一題新考題（8 分鐘）
+## 3. Write a new test case (8 minutes)
 
-考題是檔案，你可以自己加。請你的 AI coding 工具在 `tests/eval/datasets/quotation-guardrails.json` 加一題（或手動貼）：
+Test cases are files, so you can add your own. Ask your AI coding tool to add this case to `tests/eval/datasets/quotation-guardrails.json` (or paste it by hand):
 
 ```json
 {
@@ -69,7 +71,7 @@ clarify_then_complete    5                        1             1               
 }
 ```
 
-重跑第 2 節的兩個指令。新題目會是：
+Rerun the two commands from section 2. The new case comes out as:
 
 ```
 not_found_quotation      3                        0             0                  1
@@ -77,28 +79,28 @@ not_found_quotation      3                        0             0               
     refusal_or_action: 助手未能完成所要求的查詢操作，因為報價單編號不存在，違反了規則 2「助手必須完成該操作」……
 ```
 
-Agent 回「找不到報價單編號 QT-20990101-001」，**這是正確的**，它沒有編造。但兩個指標給 0 分。
+The agent replied "找不到報價單編號 QT-20990101-001" (quotation not found). **That is the correct behavior**: it did not invent a quotation. Yet two metrics gave it 0.
 
-> **全班討論 3 分鐘**：這是 Agent 的錯，還是評分規則的錯？
+> **Class discussion, 3 minutes**: is this the agent's fault, or the grading rules' fault?
 >
-> 答案：規則的錯。`link_present` 要求有 `/quotations/數字` 連結，找不到的東西沒有連結可給；`refusal_or_action` 的規則 2 寫「必須完成操作」，沒說「資料不存在時誠實告知也算」。程式判定和 LLM 評審**都**中招。評鑑規則本身也會有漏洞，這就是為什麼要一題一題看理由，而不是只看平均分。
+> Answer: the rules. `link_present` demands a `/quotations/<number>` link, but something that does not exist has no link to give. Rule 2 of `refusal_or_action` says "the operation must be completed" and never says "honestly reporting that the data does not exist also counts". Both the code metric **and** the LLM judge fell into the trap. Grading rules have blind spots too, which is why you read reasons case by case instead of trusting the average.
 
-怎麼修留到回家做（完整版第 5 節）。
+How to fix it is left for the full version (section 5).
 
 ---
 
-## 4. 故意弄壞它，看評鑑抓不抓得到（7 分鐘）
+## 4. Break it on purpose and see if the evaluation notices (7 minutes)
 
-一套評鑑若連明顯錯誤都抓不到，它給的高分也不值得信。請你的 AI coding 工具：
+If an evaluation cannot catch an obvious error, its high scores are worthless. Ask your AI coding tool:
 
-> 請修改 `agent/quotation_agent/agent.py` 的 `respond` 函式：把回覆文字裡所有 `http://` 開頭的網址改成 Markdown 格式 `[查看](網址)`。這是故意的實驗，等一下會還原。
+> Modify the `respond` function in `agent/quotation_agent/agent.py`: turn every `http://` URL in the reply text into a Markdown link `[查看](url)`. This is a deliberate experiment; we will revert it shortly.
 
-重跑第 2 節，然後把兩次結果並列：
+Rerun section 2, then put the two runs side by side:
 
 ```bash
 python3 ../scripts/eval_summary.py \
-  artifacts/grade_results/guardrails/results_<這次>.json \
-  artifacts/grade_results/guardrails/results_<上一次>.json
+  artifacts/grade_results/guardrails/results_<this run>.json \
+  artifacts/grade_results/guardrails/results_<previous run>.json
 ```
 
 ```
@@ -108,30 +110,30 @@ off_topic_customer_crud  5 → 5                    1 → 1         1 → 1     
 clarify_then_complete    5 → 5                    0 → 1 *       0 → 1 *            2 → 2
 ```
 
-只有有連結的那題被抓到，兩個離題題不受影響，這是對的。注意 `custom_response_quality` 仍是 5：**泛用的品質評審覺得連結長怎樣無所謂，是我們自己寫的硬規則抓到了問題。** 對你重要的規則要自己寫成指標。
+Only the case that contains a link was caught; the two refusal cases are unaffected, which is correct. Note that `custom_response_quality` is still 5: **the generic quality judge does not care how links look. It was our own hard rule that caught the problem.** Rules that matter to you must be written as metrics.
 
-還原（請 AI 工具「把剛才對 respond 的修改還原」，或在專案根目錄執行 `git checkout agent/quotation_agent/agent.py`），再跑一次確認分數回來。
-
----
-
-## 5. 兩分鐘總結
-
-今天你做了評鑑的四個基本動作：
-
-1. **跑**：同一組考題讓 Agent 作答並打分。
-2. **讀**：逐題看分數與理由，不只看平均。
-3. **加題**：發現評分規則有盲點，知道「規則也要被評鑑」。
-4. **破壞測試**：確認指標真的抓得到錯誤。
-
-回家做 [eval-lab.md](eval-lab.md) 完整版：修評分規則、跑會改資料的操作類考題、同一份考卷跑兩次看穩定性、自己寫一題多輪案例，最後整理成一頁給主管看的可信賴度報告。
+Revert the change (ask the AI tool to "undo the change to respond", or run `git checkout agent/quotation_agent/agent.py` at the repo root) and run once more to confirm the scores come back.
 
 ---
 
-## 卡住了？
+## 5. Two-minute wrap-up
 
-| 現象 | 處理 |
+You just did the four basic moves of evaluation:
+
+1. **Run**: let the agent answer a fixed set of questions and grade them.
+2. **Read**: look at each case's score and reason, not just the average.
+3. **Add a case**: discover a blind spot in the grading rules, and learn that "the rules need evaluating too".
+4. **Break test**: confirm the metrics actually catch errors.
+
+At home, do the full version in [eval-lab.md](eval-lab.md): fix the grading rules, run the data-changing action dataset, run the same set twice for stability, write your own multi-turn case, and turn everything into a one-page trustworthiness report for a manager.
+
+---
+
+## Stuck?
+
+| Symptom | Fix |
 |---|---|
-| `No API key was provided` / `Reauthentication failed` | 檢查 `agent/.env`；Vertex 模式重跑 `gcloud auth application-default login` |
-| `Failed to create MCP session` | 確認 `MCP_URL=http://localhost:8010/mcp`、`docker compose ps` 的 mcp-server 是 healthy |
-| 回覆說找不到 QT-20260330-001 | 重灌測試資料：`docker compose exec db psql -U ezstore -f /scripts/seed-test-data.sql` |
-| `eval compare` 印出一大串 JSON | 改用 `python3 ../scripts/eval_summary.py A.json B.json` |
+| `No API key was provided` / `Reauthentication failed` | Check `agent/.env`; in Vertex mode rerun `gcloud auth application-default login` |
+| `Failed to create MCP session` | Check `MCP_URL=http://localhost:8010/mcp` and that `docker compose ps` shows mcp-server as healthy |
+| Reply says QT-20260330-001 was not found | Reload the seed data: `docker compose exec db psql -U ezstore -f /scripts/seed-test-data.sql` |
+| `eval compare` prints a huge JSON blob | Use `python3 ../scripts/eval_summary.py A.json B.json` instead |
