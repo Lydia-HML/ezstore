@@ -263,20 +263,27 @@ EZStore 內建自然語言報價單管理助手，以 Google ADK 2.x 開發。Ag
 ```
 使用者 → React Chat UI → nginx /agent-api → Agent（ADK FastAPI，port 8080）→ MCP Server（port 8000）→ Backend REST API
                                                │                                     Streamable HTTP
-                                          Gemini 3.8 Flash                           （mcp Python SDK 2.x）
-                                        （AI Studio API key）
+                                    Gemini 3.8 Flash（AGENT_MODEL）                  （mcp Python SDK 2.x）
+                              AI Studio key／Vertex AI／（選用）OpenAI
 
 Workflow 圖（agent/quotation_agent/agent.py）：
 
-  START → load_context → classify_intent（LLM，output_schema=Intent）→ route
-            ├─ get_quotation / list_customer_quotations / duplicate_quotation
-            ├─ update_pricing_factor / adjust_total_price / convert_to_order    ← 各呼叫一個 MCP 工具
-            ├─ clarify    （缺欄位就追問，並把意圖暫存在 state.pending_intent）
-            └─ off_topic  （固定拒答，由程式決定）
-          全部 → respond  （輸出文字、更新 state.chat_history）
+  START → check_setup ──（沒有模型憑證）─────────────────────────────────────┐
+            │                                                                  │
+            └→ classify_intent（LLM，output_schema=IntentResult）→ route_intent │
+                 ├─ get_quotation / list_customer_quotations / duplicate_quotation
+                 ├─ update_pricing_factor / adjust_total_price / convert_to_order  ← 各呼叫一個 MCP 工具
+                 ├─ clarify   （缺欄位就追問，未完成的操作暫存在 state.pending）
+                 └─ refuse    （固定拒答文字，由程式決定）
+               全部 ─────────────────────────────────────────────────────────→ respond
 ```
 
-每一則使用者訊息都會從 `START` 重新跑一次圖；跨回合的記憶放在 session state（`chat_history`、`pending_intent`），所以使用者可以在下一句補上被追問的資料。
+- `check_setup`：沒有模型憑證時直接回覆清楚的錯誤（不呼叫 LLM），並把上一輪的「使用者／助手」對話交給分類節點。
+- `classify_intent`：唯一呼叫 LLM 的節點，輸出 Pydantic 結構 `IntentResult`（意圖＋抽出的欄位）。
+- `route_intent`（`routing.py`，純 Python）：決定走哪條邊、帶哪些工具參數、要追問或拒答。離題需求不會碰到任何工具。
+- `respond`：Chat UI 只顯示這個節點的文字；工具回傳的文字原樣呈現（純文字連結、「原始報價單未修改」）。
+
+每一則使用者訊息都會從 `START` 重新跑一次圖。追問後的接續靠 `state.pending`；若 session 是由既有對話紀錄接續（例如 eval 的多輪案例），則從上一輪對話判斷。
 
 **功能：**
 
@@ -295,26 +302,39 @@ Workflow 圖（agent/quotation_agent/agent.py）：
 - 離題請求 **由程式拒答**，缺少必要欄位時 **追問一輪**
 - 沒有 API key 時 Agent 仍會啟動（對話回傳清楚錯誤），`docker compose up` 不會因缺金鑰而失敗
 
-**本機開發：**
+**環境變數**（專案根目錄 `.env`，見 `.env.example`；Compose 會傳給 `agent` 容器）：
+
+| 變數 | 用途 |
+|------|------|
+| `GEMINI_API_KEY` | Google AI Studio API key（做法 A） |
+| `GOOGLE_GENAI_USE_VERTEXAI`、`GOOGLE_CLOUD_PROJECT`、`GOOGLE_CLOUD_LOCATION` | Vertex AI（做法 B；需 `gcloud auth application-default login`，在 Docker 內另需掛載 ADC 憑證） |
+| `AGENT_MODEL` | 意圖分類模型，預設 `gemini-3.8-flash`；設成 `openai/<模型>` 會改經 LiteLLM 呼叫 OpenAI |
+| `OPENAI_API_KEY` | 只有 `AGENT_MODEL=openai/...` 時需要 |
+| `MCP_URL` | MCP Server 位址。Compose 內為 `http://mcp-server:8000/mcp`；本機為 `http://localhost:8010/mcp` |
+| `JUDGE_MODEL` | 選填：eval 的 LLM 評審模型（預設沿用 `AGENT_MODEL`） |
+
+沒有任何憑證時 Agent 仍會啟動並回覆清楚的錯誤，`docker compose up` 不會因缺金鑰而失敗。
+
+**本機開發**（`db`、`backend`、`mcp-server` 以 Compose 執行；MCP Server 對本機開在 8010）：
 
 ```bash
-# MCP Server（用 8010 避免與本機其他服務撞埠）
-cd mcp_server && uv sync
-BACKEND_URL=http://localhost:8080 MCP_PORT=8010 uv run python server.py
-
-# Agent（另開終端）
-cd agent && cp .env.example .env    # 填 GEMINI_API_KEY，MCP_URL 改為 http://localhost:8010/mcp
-                                    # 或改走 Vertex AI：先 `gcloud auth application-default login`，再設 GOOGLE_GENAI_USE_VERTEXAI=true 與 GOOGLE_CLOUD_PROJECT
+cd agent
 uv sync --group dev
-agents-cli playground               # 網頁介面
-agents-cli run "我要查詢報價單，報價單編號：QT-20260330-001"
+uv run python scripts/mcp_call.py get_quotation quotation_number=QT-20260330-001   # 直接呼叫 MCP 工具
+agents-cli playground --port 8501   # 網頁介面（8080 已被 backend 使用）
 
 # 測試
-uv run pytest tests/unit -q                                            # 不需 LLM、不需 MCP
-MCP_URL=http://localhost:8010/mcp uv run pytest tests/integration -q   # 離線圖測試（有金鑰時一併跑 LLM 測試）
-agents-cli eval run --dataset tests/eval/datasets/quotation-actions.json     # 6 個操作案例（會新增資料，重跑前重灌 seed）
-agents-cli eval run --dataset tests/eval/datasets/quotation-guardrails.json  # 2 個拒答 + 1 個多輪追問
+uv run pytest tests/unit tests/integration -q    # LLM 以假回應取代；MCP Server 沒開時自動略過相關測試
+
+# Eval（操作類案例會新增資料，重跑前請重灌 seed）。
+# 只用 AI Studio key 時，agents-cli 1.9 的評分步驟仍要求 GOOGLE_CLOUD_PROJECT 有值（任意字串）。
+GOOGLE_CLOUD_PROJECT=local-only agents-cli eval run --dataset tests/eval/datasets/quotation-actions.json     # 6 個操作案例
+GOOGLE_CLOUD_PROJECT=local-only agents-cli eval run --dataset tests/eval/datasets/quotation-guardrails.json  # 2 個拒答 + 1 個多輪追問
 ```
+
+**Docker：** `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build` 會從 `./agent` 建置 Agent，之後打開 http://localhost:3000/agent。
+
+圖的設計與如何新增一個操作，見 [agent/README.md](agent/README.md)。
 
 學員用的可信賴度評鑑 LAB：課堂版 [eval-lab-quick.zh-TW.md](eval-lab-quick.zh-TW.md)（25 分鐘）、完整版 [eval-lab.zh-TW.md](eval-lab.zh-TW.md)（60–90 分鐘，回家做）。
 

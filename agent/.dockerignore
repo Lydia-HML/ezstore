@@ -1,0 +1,8 @@
+.venv
+.env
+.pytest_cache
+.ruff_cache
+.google-agents-cli
+artifacts
+tests
+**/__pycache__

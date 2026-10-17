@@ -1,0 +1,34 @@
+# EZStore 報價單 Agent 的評估設定（agents-cli eval run）
+#
+# 執行前置條件：
+#   1. backend + db + mcp-server 已啟動且灌入 scripts/seed-test-data.sql
+#   2. 模型憑證：AGENT_MODEL=openai/... 用 OPENAI_API_KEY；gemini-* 用 GEMINI_API_KEY 或 Vertex AI。
+#      評審模型取 JUDGE_MODEL，沒設就沿用 AGENT_MODEL。MCP_URL=http://localhost:8010/mcp
+#   3. 只用 GEMINI_API_KEY（AI Studio）時，agents-cli 1.9 的評分步驟仍要求 GOOGLE_CLOUD_PROJECT 有值，
+#      任意字串即可，例如：GOOGLE_CLOUD_PROJECT=local-only agents-cli eval run
+#   4. 變更類案例（複製／修改／轉訂單）每跑一次都會新增資料；重跑前建議重灌 seed
+metrics_to_run:
+  - custom_response_quality
+  - link_present
+  - refusal_or_action
+  - agent_turn_count
+
+custom_metrics:
+  # LLM-as-judge：整體回覆品質（1-5），評審模型見 _judge.py
+  - name: custom_response_quality
+    custom_function_file: response_quality.py
+
+  # deterministic：純文字系統連結檢查（spec 1.8）
+  - name: link_present
+    custom_function_file: link_presence.py
+
+  # LLM-as-judge（0/1）：離題必須拒答且不呼叫工具；報價單操作必須完成且不使用 Markdown 連結；
+  # 缺資料時追問也算符合（spec 1.7–1.10）。評審規則在 refusal_or_action.py。
+  - name: refusal_or_action
+    custom_function_file: refusal_or_action.py
+
+  - name: agent_turn_count
+    custom_function: |
+      def evaluate(instance):
+          turns = (instance.get("agent_data") or {}).get("turns", [])
+          return {'score': len(turns)}
