@@ -37,6 +37,7 @@ from .routing import (  # noqa: E402
     ROUTE_REFUSE,
     clarify_message,
     plan,
+    previous_exchange,
 )
 from .schemas import Intent, IntentResult, Pending, Plan  # noqa: E402
 
@@ -63,7 +64,15 @@ intent 只能是下列其中一個：
 - 欄位只填使用者在這則訊息裡明確寫出的值，沒寫的一律留空，不可猜測或補值。
 - 報價單編號原樣抄寫（例如 QT-20260330-001）。
 - 使用者說要做某個操作但沒給編號或數值時，intent 仍填該操作，欄位留空。
-{pending_hint?}"""
+- 若下方提供了上一輪對話，而這則訊息只是在回答助手的追問（例如只給了報價單編號或數值），
+  intent 填上一輪使用者要做的操作，欄位可合併上一輪使用者明確寫出的值；其他情況只看這則訊息。
+{previous_exchange?}{pending_hint?}"""
+
+
+def _event_text(event: Event) -> str:
+    if not event.content or not event.content.parts:
+        return ""
+    return "".join(part.text or "" for part in event.content.parts if not part.thought)
 
 
 def _text(node_input: Any) -> str:
@@ -72,11 +81,23 @@ def _text(node_input: Any) -> str:
     return str(node_input)
 
 
-def check_setup(node_input: types.Content):
-    """沒有模型憑證時直接回覆清楚的錯誤訊息，不進 LLM 節點。"""
+def check_setup(ctx: Context, node_input: types.Content):
+    """沒有模型憑證時直接回覆清楚的錯誤訊息，不進 LLM 節點。
+
+    同時把上一輪的「使用者訊息／助手回覆」放進 state，讓分類節點在追問後能接續。
+    只靠 state 裡的 pending 不夠：session 若是由既有對話紀錄接續（例如 eval 的多輪案例），
+    pending 不存在，但對話紀錄還在。
+    """
     if not has_credentials(MODEL):
         return Event(output=NOT_CONFIGURED_MESSAGE, route=ROUTE_NOT_CONFIGURED)
-    return Event(output=_text(node_input), route=ROUTE_READY)
+    exchange = previous_exchange(
+        [(event.author, _event_text(event)) for event in ctx.session.events]
+    )
+    return Event(
+        output=_text(node_input),
+        route=ROUTE_READY,
+        state={"previous_exchange": exchange},
+    )
 
 
 classify_intent = LlmAgent(

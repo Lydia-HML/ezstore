@@ -145,3 +145,24 @@ def test_every_operation_intent_has_required_args():
 
 def test_refusal_message_has_no_link():
     assert "http" not in REFUSAL_MESSAGE
+
+
+def test_previous_exchange_picks_last_user_turn_and_reply():
+    from quotation_agent.routing import previous_exchange
+
+    events = [
+        ("user", "我要查詢報價單"),
+        ("classify_intent", '{"intent":"get_quotation"}'),
+        ("quotation_agent", "要查詢報價單，還需要您提供：報價單編號"),
+        ("user", "QT-20260330-001"),
+    ]
+    text = previous_exchange(events)
+    assert "使用者：我要查詢報價單" in text
+    assert "助手：要查詢報價單，還需要您提供：報價單編號" in text
+    assert "intent" not in text
+
+
+def test_previous_exchange_empty_on_first_turn():
+    from quotation_agent.routing import previous_exchange
+
+    assert previous_exchange([("user", "我要查詢報價單")]) == ""

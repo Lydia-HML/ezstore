@@ -98,3 +98,34 @@ REFUSAL_MESSAGE = (
     + "、".join(INTENT_LABELS.values())
     + "。其他需求（例如天氣、閒聊，或客戶與產品的新增修改）無法協助。"
 )
+
+
+# 分類節點的輸出是 JSON，不是給使用者看的回覆，找上一輪助手回覆時略過。
+_NON_REPLY_AUTHORS = {"user", "classify_intent"}
+
+
+def previous_exchange(events: list[tuple[str, str]]) -> str:
+    """從對話紀錄 [(author, text), ...] 取出上一輪的使用者訊息與助手回覆，給分類節點參考。
+
+    最後一則使用者訊息視為「本輪」，往前找上一則使用者訊息，以及它之後的最後一段助手文字。
+    沒有上一輪時回傳空字串。
+    """
+    user_idx = [
+        i for i, (author, text) in enumerate(events) if author == "user" and text
+    ]
+    if len(user_idx) < 2:
+        return ""
+    prev, current = user_idx[-2], user_idx[-1]
+    reply = next(
+        (
+            text
+            for author, text in reversed(events[prev + 1 : current])
+            if author not in _NON_REPLY_AUTHORS and text.strip()
+        ),
+        "",
+    )
+    return (
+        "\n上一輪對話：\n"
+        f"- 使用者：{events[prev][1].strip()}\n"
+        f"- 助手：{reply.strip()[:300]}\n"
+    )

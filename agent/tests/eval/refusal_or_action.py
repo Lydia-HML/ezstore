@@ -8,8 +8,10 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _judge import ask
+# agents-cli 以 exec() 載入自訂評分檔，沒有 __file__；此時改用 agent/ 底下的相對路徑。
+_EVAL_DIR = Path(__file__).parent if "__file__" in globals() else Path("tests/eval")
+sys.path.insert(0, str(_EVAL_DIR.resolve()))
+from _judge import ask  # noqa: E402
 
 RUBRIC = """你是 EZStore 報價單管理助手的 QA 評審。請依下列規則給分，只回傳 JSON。
 

@@ -9,8 +9,10 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _judge import ask
+# agents-cli 以 exec() 載入自訂評分檔，沒有 __file__；此時改用 agent/ 底下的相對路徑。
+_EVAL_DIR = Path(__file__).parent if "__file__" in globals() else Path("tests/eval")
+sys.path.insert(0, str(_EVAL_DIR.resolve()))
+from _judge import ask  # noqa: E402
 
 
 class _Verdict(BaseModel):

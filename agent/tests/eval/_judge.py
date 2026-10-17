@@ -7,6 +7,7 @@
 import os
 import threading
 from pathlib import Path
+from typing import TypeVar
 
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -16,6 +17,9 @@ load_dotenv(_AGENT_ROOT / ".env")
 load_dotenv(_AGENT_ROOT.parent / ".env")
 
 _local = threading.local()
+
+# agents-cli 在自己的 Python 3.11 環境載入評分檔，不能用 3.12 的 def f[T] 泛型語法。
+T = TypeVar("T", bound=BaseModel)
 
 
 def judge_model() -> str:
@@ -36,7 +40,7 @@ def _genai_client():
     return client
 
 
-def ask[T: BaseModel](prompt: str, schema: type[T]) -> tuple[T | None, str]:
+def ask(prompt: str, schema: type[T]) -> tuple[T | None, str]:  # noqa: UP047
     """回傳 (解析後的結構, 原始文字)。模型沒給出可用結果時結構為 None。"""
     model = judge_model()
     if model.startswith("openai/"):
