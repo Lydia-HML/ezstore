@@ -63,5 +63,5 @@
 4.1. 熟悉 MCP Server：先把 db、backend、mcp-server 用 Docker Compose 跑起來並灌入測試資料，然後用 MCP client 或 curl 呼叫 `get_quotation`。驗收方式：把回傳的文字貼給我看，內容要有 QT-20260330-001 的品項與系統連結。
 4.2. Agent 本機測試：scaffold、寫好 Workflow、接上 MCP Server，用 `agents-cli playground` 測試。驗收方式：我會輸入第 1 節的六句指令、一句離題的話、以及先漏掉報價單編號再補上的兩句，你先告訴我每一句應該看到什麼。
 4.3. Docker 與 Chat UI：加進 Compose，`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build` 一次啟動全部服務。驗收方式：`docker compose ps` 每個服務都是 running 或 healthy；我在瀏覽器 http://localhost:3000/agent 輸入同樣的指令，回覆裡的連結要能點開對應的報價單或訂單頁。
-4.4. Eval：`agents-cli eval run` 要能執行，把結果表貼給我。
+4.4. Eval 與自我驗收評分：`agents-cli eval run` 要能執行；接著在專案根目錄執行 `python3 scripts/grading/grade_agent.py --suite scripts/grading/student-suite.json`，它會用獨立的評分規則跑你的兩個題庫加兩題額外考題，並查後端確認原單未改、複製單與訂單存在，給出 0–100 的分數。把結果表與分數貼給我；助教會用另一份題庫、同一支程式評分。
 4.5. CI 與 README：最後更新。

@@ -336,7 +336,7 @@ GOOGLE_CLOUD_PROJECT=local-only agents-cli eval run --dataset tests/eval/dataset
 
 圖的設計與如何新增一個操作，見 [agent/README.md](agent/README.md)。
 
-學員用的可信賴度評鑑 LAB：課堂版 [eval-lab-quick.md](eval-lab-quick.md)（25 分鐘）、完整版 [eval-lab.md](eval-lab.md)（60–90 分鐘，回家做）。
+學員用的可信賴度評鑑 LAB：課堂版 [eval-lab-quick.zh-TW.md](eval-lab-quick.zh-TW.md)（25 分鐘）、完整版 [eval-lab.zh-TW.md](eval-lab.zh-TW.md)（60–90 分鐘，回家做）。
 
 ### 授權
 

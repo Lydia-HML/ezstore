@@ -11,9 +11,9 @@ import (
 )
 
 type QuotationCreateInput struct {
-	CustomerID    uint            `json:"customer_id" binding:"required"`
-	PricingFactor decimal.Decimal `json:"pricing_factor" binding:"required"`
-	Notes         string          `json:"notes"`
+	CustomerID    uint                 `json:"customer_id" binding:"required"`
+	PricingFactor decimal.Decimal      `json:"pricing_factor" binding:"required"`
+	Notes         string               `json:"notes"`
 	Items         []QuotationItemInput `json:"items" binding:"required,min=1"`
 }
 
@@ -52,18 +52,12 @@ func (s *QuotationService) Create(input *QuotationCreateInput) (*models.Quotatio
 		return nil, errors.New("客戶不存在")
 	}
 
-	number, err := s.generateNumber()
-	if err != nil {
-		return nil, err
-	}
-
 	quotation := &models.Quotation{
-		QuotationNumber: number,
-		CustomerID:      input.CustomerID,
-		CustomerLevel:   customer.Level,
-		PricingFactor:   input.PricingFactor,
-		Status:          "draft",
-		Notes:           input.Notes,
+		CustomerID:    input.CustomerID,
+		CustomerLevel: customer.Level,
+		PricingFactor: input.PricingFactor,
+		Status:        "draft",
+		Notes:         input.Notes,
 	}
 
 	items, err := s.buildItems(input.Items, input.PricingFactor)
@@ -74,7 +68,7 @@ func (s *QuotationService) Create(input *QuotationCreateInput) (*models.Quotatio
 
 	s.computeTotals(quotation)
 
-	if err := s.Repo.Create(quotation); err != nil {
+	if err := createWithRetry(s.generateNumber, func(n string) { quotation.QuotationNumber = n }, func() error { return s.Repo.Create(quotation) }); err != nil {
 		return nil, err
 	}
 
@@ -152,11 +146,6 @@ func (s *QuotationService) Duplicate(id uint) (*models.Quotation, error) {
 		return nil, errors.New("來源報價單不存在")
 	}
 
-	number, err := s.generateNumber()
-	if err != nil {
-		return nil, err
-	}
-
 	// Build items from source items (re-fetch product snapshots for latest data)
 	itemInputs := make([]QuotationItemInput, 0, len(source.Items))
 	for _, item := range source.Items {
@@ -174,18 +163,17 @@ func (s *QuotationService) Duplicate(id uint) (*models.Quotation, error) {
 	notes := formatDuplicateNotes(source.QuotationNumber, source.Notes)
 
 	newQuotation := &models.Quotation{
-		QuotationNumber: number,
-		CustomerID:      source.CustomerID,
-		CustomerLevel:   source.CustomerLevel,
-		PricingFactor:   source.PricingFactor,
-		Status:          "draft",
-		Notes:           notes,
-		Items:           items,
+		CustomerID:    source.CustomerID,
+		CustomerLevel: source.CustomerLevel,
+		PricingFactor: source.PricingFactor,
+		Status:        "draft",
+		Notes:         notes,
+		Items:         items,
 	}
 
 	s.computeTotals(newQuotation)
 
-	if err := s.Repo.Create(newQuotation); err != nil {
+	if err := createWithRetry(s.generateNumber, func(n string) { newQuotation.QuotationNumber = n }, func() error { return s.Repo.Create(newQuotation) }); err != nil {
 		return nil, err
 	}
 
@@ -243,13 +231,14 @@ func (s *QuotationService) computeTotals(q *models.Quotation) {
 	}
 }
 
-func (s *QuotationService) generateNumber() (string, error) {
+// generateNumber 產生 QT-YYYYMMDD-NNN；offset 用於撞號重試時往後推序號。
+func (s *QuotationService) generateNumber(offset int64) (string, error) {
 	count, err := s.Repo.CountToday()
 	if err != nil {
 		return "", err
 	}
 	today := time.Now().Format("20060102")
-	return fmt.Sprintf("QT-%s-%03d", today, count+1), nil
+	return fmt.Sprintf("QT-%s-%03d", today, count+1+offset), nil
 }
 
 func formatDuplicateNotes(sourceNumber, sourceNotes string) string {
