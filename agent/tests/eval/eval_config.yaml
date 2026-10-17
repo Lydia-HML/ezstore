@@ -4,7 +4,9 @@
 #   1. backend + db + mcp-server 已啟動且灌入 scripts/seed-test-data.sql
 #   2. 模型憑證：AGENT_MODEL=openai/... 用 OPENAI_API_KEY；gemini-* 用 GEMINI_API_KEY 或 Vertex AI。
 #      評審模型取 JUDGE_MODEL，沒設就沿用 AGENT_MODEL。MCP_URL=http://localhost:8010/mcp
-#   3. 變更類案例（複製／修改／轉訂單）每跑一次都會新增資料；重跑前建議重灌 seed
+#   3. 只用 GEMINI_API_KEY（AI Studio）時，agents-cli 1.9 的評分步驟仍要求 GOOGLE_CLOUD_PROJECT 有值，
+#      任意字串即可，例如：GOOGLE_CLOUD_PROJECT=local-only agents-cli eval run
+#   4. 變更類案例（複製／修改／轉訂單）每跑一次都會新增資料；重跑前建議重灌 seed
 metrics_to_run:
   - custom_response_quality
   - link_present
