@@ -263,20 +263,27 @@ EZStore includes a natural-language quotation assistant built with Google ADK 2.
 ```
 User → React Chat UI → nginx /agent-api → Agent (ADK FastAPI, port 8080) → MCP Server (port 8000) → Backend REST API
                                                │                                  Streamable HTTP
-                                          Gemini 3.8 Flash                        (mcp Python SDK 2.x)
-                                        (AI Studio API key)
+                                    Gemini 3.8 Flash (AGENT_MODEL)                (mcp Python SDK 2.x)
+                              AI Studio key / Vertex AI / optional OpenAI
 
 Workflow graph (agent/quotation_agent/agent.py):
 
-  START → load_context → classify_intent (LLM, output_schema=Intent) → route
-            ├─ get_quotation / list_customer_quotations / duplicate_quotation
-            ├─ update_pricing_factor / adjust_total_price / convert_to_order    ← each calls one MCP tool
-            ├─ clarify     (missing fields → ask, keep state.pending_intent)
-            └─ off_topic   (fixed refusal, decided by code)
-          all → respond    (emit text + update state.chat_history)
+  START → check_setup ──(no credentials)──────────────────────────────────────┐
+            │                                                                  │
+            └→ classify_intent (LLM, output_schema=IntentResult) → route_intent │
+                 ├─ get_quotation / list_customer_quotations / duplicate_quotation
+                 ├─ update_pricing_factor / adjust_total_price / convert_to_order  ← each calls one MCP tool
+                 ├─ clarify   (missing fields → ask; pending operation kept in state.pending)
+                 └─ refuse    (fixed refusal text, decided by code)
+               all ─────────────────────────────────────────────────────────→ respond
 ```
 
-Every user message re-runs the graph from `START`; cross-turn memory lives in session state (`chat_history`, `pending_intent`), so a user can answer a clarification question in the next message.
+- `check_setup` replies with a clear error when no model credentials are set (no LLM call), and passes the previous user/assistant exchange to the classifier.
+- `classify_intent` is the only LLM node. It returns a Pydantic `IntentResult` (intent + extracted fields).
+- `route_intent` (`routing.py`, pure Python) decides the edge, the tool arguments, clarification and refusal. Off-topic requests never reach a tool.
+- `respond` is the only node whose text the Chat UI shows; tool output is passed through unchanged (plain-text links, "original quotation unchanged").
+
+Every user message re-runs the graph from `START`. A clarification is continued either from `state.pending` or, when the session was rebuilt from history (e.g. multi-turn eval cases), from the previous exchange.
 
 **Capabilities:**
 
@@ -295,26 +302,39 @@ Every user message re-runs the graph from `START`; cross-turn memory lives in se
 - Off-topic requests are **refused by code**, missing fields trigger a **clarification turn**
 - Agent runs even without an API key (chat returns a clear error), so `docker compose up` never fails on a missing key
 
-**Local development:**
+**Environment variables** (project-root `.env`, see `.env.example`; Compose passes them to the `agent` container):
+
+| Variable | Purpose |
+|----------|---------|
+| `GEMINI_API_KEY` | Google AI Studio key (option A) |
+| `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` | Vertex AI (option B; needs `gcloud auth application-default login`, and ADC mounted when running in Docker) |
+| `AGENT_MODEL` | Classifier model, default `gemini-3.8-flash`. `openai/<model>` switches to OpenAI via LiteLLM |
+| `OPENAI_API_KEY` | Only when `AGENT_MODEL=openai/...` |
+| `MCP_URL` | MCP Server URL. Compose: `http://mcp-server:8000/mcp`; local: `http://localhost:8010/mcp` |
+| `JUDGE_MODEL` | Optional LLM-judge model for eval (defaults to `AGENT_MODEL`) |
+
+Without any credentials the agent still starts and replies with a clear error, so `docker compose up` never fails on a missing key.
+
+**Local development** (with `db`, `backend`, `mcp-server` running in Compose; the MCP Server is exposed on host port 8010):
 
 ```bash
-# MCP Server (port 8010 to avoid clashing with other local services)
-cd mcp_server && uv sync
-BACKEND_URL=http://localhost:8080 MCP_PORT=8010 uv run python server.py
-
-# Agent (in another terminal)
-cd agent && cp .env.example .env    # fill GEMINI_API_KEY, set MCP_URL=http://localhost:8010/mcp
-                                    # or Vertex AI: GOOGLE_GENAI_USE_VERTEXAI=true + GOOGLE_CLOUD_PROJECT after `gcloud auth application-default login`
+cd agent
 uv sync --group dev
-agents-cli playground               # web UI
-agents-cli run "我要查詢報價單，報價單編號：QT-20260330-001"
+uv run python scripts/mcp_call.py get_quotation quotation_number=QT-20260330-001   # call an MCP tool directly
+agents-cli playground --port 8501   # web UI (8080 is taken by the backend)
 
 # Tests
-uv run pytest tests/unit -q                       # no LLM, no MCP
-MCP_URL=http://localhost:8010/mcp uv run pytest tests/integration -q   # offline graph tests (+ LLM tests when key is set)
-agents-cli eval run --dataset tests/eval/datasets/quotation-actions.json    # 6 action cases (creates data; reseed before rerun)
-agents-cli eval run --dataset tests/eval/datasets/quotation-guardrails.json # 2 refusals + 1 multi-turn clarification
+uv run pytest tests/unit tests/integration -q    # LLM is faked; MCP tests are skipped when the MCP Server is down
+
+# Eval (reseed before rerunning; action cases create data).
+# With an AI Studio key only, agents-cli 1.9 still needs GOOGLE_CLOUD_PROJECT set to any value when grading.
+GOOGLE_CLOUD_PROJECT=local-only agents-cli eval run --dataset tests/eval/datasets/quotation-actions.json     # 6 action cases
+GOOGLE_CLOUD_PROJECT=local-only agents-cli eval run --dataset tests/eval/datasets/quotation-guardrails.json  # 2 refusals + 1 multi-turn clarification
 ```
+
+**Docker:** `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build` builds the agent from `./agent`; then open http://localhost:3000/agent.
+
+See [agent/README.md](agent/README.md) for the graph design and how to add an operation.
 
 Trustworthiness evaluation labs for learners: [eval-lab-quick.md](eval-lab-quick.md) (25 min, in class) and [eval-lab.md](eval-lab.md) (60–90 min, full version).
 
